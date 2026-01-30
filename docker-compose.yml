@@ -1,0 +1,52 @@
+services:
+  qdrant:
+    image: qdrant/qdrant
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    healthcheck:
+      test: ["CMD-SHELL", "cat /proc/net/tcp | grep C735 || exit 1"] # Check port 6333 (0x18BD = 6333)
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  inngest:
+    image: node:18-slim
+    command: npx inngest-cli@latest dev -u http://backend:8000/api/inngest --no-discovery --host 0.0.0.0
+    ports:
+      - "8288:8288"
+    depends_on:
+      - backend
+
+  backend:
+    build: .
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - INNGEST_API_BASE=http://inngest:8288/v1
+    depends_on:
+      qdrant:
+        condition: service_healthy
+    volumes:
+      - .:/app # Sync code for development
+      - ./uploads:/app/uploads
+
+  frontend:
+    build: .
+    command: streamlit run steamlit_app.py
+    ports:
+      - "8501:8501"
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - INNGEST_API_BASE=http://inngest:8288/v1
+    depends_on:
+      - backend
+    volumes:
+      - .:/app # Sync code for development
+      - ./uploads:/app/uploads
+
+volumes:
+  qdrant_data:

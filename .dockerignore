@@ -1,0 +1,9 @@
+.git
+.venv
+__pycache__
+qdrant_storage
+uploads
+*.pyc
+.env
+.DS_Store
+image
